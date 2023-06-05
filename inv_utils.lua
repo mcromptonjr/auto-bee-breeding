@@ -231,17 +231,11 @@ local function waitFromBiome()
     gps.moveTo(config.biomeFinishPos)
     for slot = 1, inventory.getInventorySize(sides.up) do
       local item = inventory.getStackInSlot(sides.up, slot)
-      if item ~= nil and utils.isPrincess(item) then
-        isDone = true
-        break
-      end
-    end
-    for slot = 1, inventory.getInventorySize(sides.up) do
-      local item = inventory.getStackInSlot(sides.up, slot)
       if item ~= nil then
         local stackSize = item.size
         if utils.isPrincess(item) then
           robot.select(config.princessSlot)
+          isDone = true
         else
           robot.select(config.alvearySlot)
         end
@@ -250,6 +244,7 @@ local function waitFromBiome()
     end
     gps.moveHome(config.biomeFinishPos)
     dropOffLarvae()
+    trashUselessBees()
   end
 end
 

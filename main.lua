@@ -13,8 +13,8 @@ local inv_utils = require("inv_utils")
 -- DONE ensureSupply should be a supply of pure drones
 -- DONE Once we have enough of a pure supply, delete hybrid drones
 -- DONE Transvector dislocator for bees that need certain blocks under alveary
--- Set up alvearies in target biomes and temperature locations (Hellish, Icy, Forest)
--- Teleport bee pairs to these locations
+-- DONE Set up alvearies in target biomes and temperature locations (Hellish, Icy, Forest)
+-- DONE Teleport bee pairs to these locations
 -- DONE Add overrides to config
 -- DONE Add support block to config
 -- DONE Get Drones that have the target type as the inactive type (preferrably)
@@ -26,7 +26,7 @@ local inv_utils = require("inv_utils")
 -- Infusion ritual robot
 -- Teleposers for eugene
 
-local lastTool = nil
+local lastTool = config.pickaxeName
 
 local tasks = inv_utils.calculateBeeBreedTasks()
 
@@ -46,11 +46,11 @@ for task = 1, #tasks do
     local biome = v.biome
     
     local support = v.support
-    local tool = v.tool
+    local tool = v.tool == nil and config.pickaxeName or v.tool
     
     print("Support: ", support)
     breed.placeSupportBlock(support, lastTool)
-    lastTool = tool
+    lastTool = tool ~= nil and tool or lastTool
     print("Breed: ", targetType)
     breed.breedOnce(princessType, droneType, targetType, overrideTemp, overrideHumidity, biome)
     print("Purify")

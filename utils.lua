@@ -33,6 +33,11 @@ local function isHybrid(bee)
   return getActiveSpecies(bee) ~= getInactiveSpecies(bee)
 end
 
+local function hasDenylistEffect(bee)
+  local activeEffect = bee.individual.active.effect
+  return (activeEffect ~= nil and config.denylistEffects[activeEffect])
+end
+
 local function listUsefulBeeTypes()
   local usefulTypes = {}
   for k, v in pairs(config.beeTree) do
@@ -75,5 +80,6 @@ return {
   tableLength = tableLength,
   listUsefulBeeTypes = listUsefulBeeTypes,
   getActiveSpecies = getActiveSpecies,
-  getInactiveSpecies = getInactiveSpecies
+  getInactiveSpecies = getInactiveSpecies,
+  hasDenylistEffect = hasDenylistEffect
 }

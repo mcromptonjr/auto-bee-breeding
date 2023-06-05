@@ -6,9 +6,18 @@ local config = require("config")
 local sides = require("sides")
 local utils = require("utils")
 local gps = require("gps")
+local computer = require("computer")
 
 local function addBeePair()
   --print("Adding bee pair to Alveary")
+  local princess = inventory.getStackInInternalSlot(config.princessSlot)
+  local drone = inventory.getStackInInternalSlot(config.droneSlot)
+  while princess == nil or drone == nil or utils.hasDenylistEffect(princess) do
+    computer.beep("...---...")
+    os.execute("sleep " .. config.acclimatizeSleepTime)
+    princess = inventory.getStackInInternalSlot(config.princessSlot)
+    drone = inventory.getStackInInternalSlot(config.droneSlot)
+  end
   robot.up()
   robot.up()
   robot.select(config.princessSlot)

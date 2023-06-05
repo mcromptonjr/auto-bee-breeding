@@ -11,10 +11,6 @@ local robot = require("robot")
 local sides = require("sides")
 
 local function placeSupportBlock(block, tool)
-  if block == nil then
-    return
-  end
-  
   gps.moveTo(config.alvearySupplyPos)
   for slot = 1, inventory.getInventorySize(sides.down) do
     local item = inventory.getStackInSlot(sides.down, slot)
@@ -190,17 +186,20 @@ local function breedOnce(princessType, droneType, targetType, tempOverride, humi
       alveary.toggleStabilizer(0)
       inv_utils.getDrone(droneType, targetType)
     end
+    
+    princess = inventory.getStackInInternalSlot(config.princessSlot)
+    local drone = inventory.getStackInInternalSlot(config.droneSlot)
 
-    if utils.getBeeType(princess) == princessType and biome ~= nil then
+    if utils.getBeeType(princess) == princessType and biome ~= nil and utils.getBeeType(drone) ~= targetType and utils.getInactiveSpecies(princess) ~= targetType and utils.getInactiveSpecies(drone) ~= targetType then
       inv_utils.sendToBiome(biome)
       inv_utils.waitFromBiome()
     else
       alveary.addBeePair()
       alveary.waitForQueenDeath()
+      alveary.takeAllFromAlveary()
+      inv_utils.pickUpLarvae()
     end
 
-    alveary.takeAllFromAlveary()
-    inv_utils.pickUpLarvae()
     inv_utils.trashUselessBees()
     inv_utils.dropOffLarvae()
     inv_utils.dropOffDrones()
