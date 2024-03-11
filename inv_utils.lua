@@ -22,7 +22,7 @@ local function getFirstAvailableSlot(side)
 end
 
 local function getAvailableDroneTypes()
-  gps.moveTo(config.dronePos)
+  gps.move(config.locs["DroneSupply"].pos)
   local set = {}
   for slot = 1, inventory.getInventorySize(sides.down) do
     local item = inventory.getStackInSlot(sides.down, slot)
@@ -30,7 +30,6 @@ local function getAvailableDroneTypes()
       set[item.individual.displayName] = true
     end
   end
-  gps.moveHome(config.dronePos)
   return set
 end
 
@@ -56,38 +55,34 @@ end
 -- Assumes bee to acclimatize is in slot 16 (should be a Queen)
 local function acclimatize(tempOverride, humidityOverride)
   robot.select(16)
-  gps.moveTo(config.accPos)
+  gps.move(config.locs["Acclimatizer"].pos)
   inventory.dropIntoSlot(sides.down, getFirstAvailableSlot(sides.down))
-  gps.moveHome(config.accPos)
   local isDone = false
   while not isDone do
+    gps.move(config.locs["AcclimatizerResult"].pos)
     os.execute("sleep " .. config.acclimatizeSleepTime)
-    gps.moveTo(config.accResPos)
     isDone = inventory.suckFromSlot(sides.down, 1)
-    gps.moveHome(config.accResPos)
   end
-  
-  alveary.acclimatizeAlveary(inventory.getStackInInternalSlot(config.princessSlot), tempOverride, humidityOverride)
+  if config.enableAcclimatizeAlveary then
+    alveary.acclimatizeAlveary(inventory.getStackInInternalSlot(config.princessSlot), tempOverride, humidityOverride)
+  end
 end
 
 local function getBestPrincess(princessType)
   robot.select(16)
-  gps.moveTo(config.progPrincessPos)
+  gps.move(config.locs["InProgressPrincess"].pos)
   for slot = 1, inventory.getInventorySize(sides.down) do
     local princess = inventory.getStackInSlot(sides.down, slot)
     if princess ~= nil and utils.getBeeType(princess) == princessType then
       inventory.suckFromSlot(sides.down, slot, 1)
-      gps.moveHome(config.progPrincessPos)
       return
     end
   end
-  gps.moveHome(config.progPrincessPos)
-  gps.moveTo(config.princessPos)
+  gps.move(config.locs["PrincessSupply"].pos)
   for slot = 1, inventory.getInventorySize(sides.down) do
     local princess = inventory.getStackInSlot(sides.down, slot)
     if princess ~= nil and utils.getBeeType(princess) == princessType then
       inventory.suckFromSlot(sides.down, slot, 1)
-      gps.moveHome(config.princessPos)
       return
     end
   end
@@ -95,17 +90,15 @@ local function getBestPrincess(princessType)
     local princess = inventory.getStackInSlot(sides.down, slot)
     if princess ~= nil then
       inventory.suckFromSlot(sides.down, slot, 1)
-      gps.moveHome(config.princessPos)
       return
     end
   end
-  gps.moveHome(config.princessPos)
   error("No princesses left in the supply!")
 end
 
 local function getDrone(droneType, targetType)
   robot.select(15)
-  gps.moveTo(config.dronePos)
+  gps.move(config.locs["DroneSupply"].pos)
   local selectedSlot = 0
   for slot = 1, inventory.getInventorySize(sides.down) do
     local drone = inventory.getStackInSlot(sides.down, slot)
@@ -121,22 +114,20 @@ local function getDrone(droneType, targetType)
   else
     error("Could not find a drone of type: ", droneType)
   end
-  gps.moveHome(config.dronePos)
 end
 
 local function pickUpLarvae()
-  gps.moveTo(config.larvaePos)
+  gps.move(config.locs["LarvaeOutput"].pos)
   for slot = 1, inventory.getInventorySize(sides.down) do
     local item = inventory.getStackInSlot(sides.down, slot)
     if item ~= nil then
       inventory.suckFromSlot(sides.down, slot)
     end
   end
-  gps.moveHome(config.larvaePos)
 end
 
 local function trashUselessBees()
-  gps.moveTo(config.trashPos)
+  gps.move(config.locs["Trash"].pos)
   local usefulTypes = utils.listUsefulBeeTypes()
   for slot = 1, robot.inventorySize() do
     if slot ~= config.princessSlot then
@@ -154,11 +145,10 @@ local function trashUselessBees()
       end
     end
   end
-  gps.moveHome(config.trashPos)
 end
 
 local function dropOffLarvae()
-  gps.moveTo(config.larvaeDronePos)
+  gps.move(config.locs["LarvaeDropoff"].pos)
   for slot = 1, robot.inventorySize() do
     local item = inventory.getStackInInternalSlot(slot)
     if item ~= nil then
@@ -168,11 +158,10 @@ local function dropOffLarvae()
       end
     end
   end
-  gps.moveHome(config.larvaeDronePos)
 end
 
 local function dropOffDrones()
-  gps.moveTo(config.scannerPos)
+  gps.move(config.locs["ScannerDropoff"].pos)
   for slot = 1, robot.inventorySize() do
     local item = inventory.getStackInInternalSlot(slot)
     if item ~= nil then
@@ -182,21 +171,19 @@ local function dropOffDrones()
       end
     end
   end
-  gps.moveHome(config.scannerPos)
 end
 
 local function dropOffPrincess()
   local item = inventory.getStackInInternalSlot(config.princessSlot)
   if item ~= nil and utils.isPrincess(item) then
-    gps.moveTo(config.progPrincessPos)
+    gps.move(config.locs["InProgressPrincess"].pos)
     robot.select(config.princessSlot)
     inventory.dropIntoSlot(sides.down, getFirstAvailableSlot(sides.down))
-    gps.moveHome(config.progPrincessPos)
   end
 end
 
 local function getNumDrones(type, isPure)
-  gps.moveTo(config.dronePos)
+  gps.move(config.locs["DroneSupply"].pos)
   local count = 0
   for slot = 1, inventory.getInventorySize(sides.down) do
     local item = inventory.getStackInSlot(sides.down, slot)
@@ -211,26 +198,26 @@ local function getNumDrones(type, isPure)
     end
   end
   
-  gps.moveHome(config.dronePos)
   return count
 end
 
 local function sendToBiome(biome)
-  gps.moveTo(config.biomePos[biome])
+  gps.move(config.biomePos[biome])
+  gps.turn(config.biomeDir)
   robot.select(config.princessSlot)
-  inventory.dropIntoSlot(sides.up, getFirstAvailableSlot(sides.up))
+  inventory.dropIntoSlot(sides.forward, getFirstAvailableSlot(sides.forward))
   robot.select(config.droneSlot)
-  inventory.dropIntoSlot(sides.up, getFirstAvailableSlot(sides.up))
-  gps.moveHome(config.biomePos[biome])
+  inventory.dropIntoSlot(sides.forward, getFirstAvailableSlot(sides.forward))
 end
 
 local function waitFromBiome()
   local isDone = false
   while not isDone do
     os.execute("sleep " .. config.acclimatizeSleepTime)
-    gps.moveTo(config.biomeFinishPos)
-    for slot = 1, inventory.getInventorySize(sides.up) do
-      local item = inventory.getStackInSlot(sides.up, slot)
+    gps.move(config.biomeFinishPos)
+    gps.turn(config.biomeDir)
+    for slot = 1, inventory.getInventorySize(sides.forward) do
+      local item = inventory.getStackInSlot(sides.forward, slot)
       if item ~= nil then
         local stackSize = item.size
         if utils.isPrincess(item) then
@@ -239,12 +226,12 @@ local function waitFromBiome()
         else
           robot.select(config.alvearySlot)
         end
-        inventory.suckFromSlot(sides.up, slot, stackSize)
+        inventory.suckFromSlot(sides.forward, slot, stackSize)
       end
     end
-    gps.moveHome(config.biomeFinishPos)
     dropOffLarvae()
     trashUselessBees()
+    gps.move()
   end
 end
 

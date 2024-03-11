@@ -2,6 +2,9 @@
 local breed = require("breed")
 local config = require("config")
 local inv_utils = require("inv_utils")
+local inventory = require("component").inventory_controller
+local computer = require("computer")
+local gps = require("gps")
 
 -- DONE Pipe in mutation stuff
 -- DONE (NEED TESTING) Add in code to ensure X supply of drones
@@ -43,14 +46,24 @@ for task = 1, #tasks do
     local targetType = k
     local overrideTemp = v.overrideTemp
     local overrideHumidity = v.overrideHumidity
+    local supportBiome = (v.biome ~= nil) and v.biome or "None"
     local biome = v.biome
+    local needsHumanHelp = v.needsHumanHelp
     
     local support = v.support
     local tool = v.tool == nil and config.pickaxeName or v.tool
     
     print("Support: ", support)
-    breed.placeSupportBlock(support, lastTool)
+    breed.placeSupportBlock(support, lastTool, config.biomePos[supportBiome])
     lastTool = tool ~= nil and tool or lastTool
+    
+    local firstSlot = inventory.getStackInInternalSlot(1)
+    while needsHumanHelp and (firstSlot == nil or firstSlot.label ~= "Stone") do
+      computer.beep("...---...")
+      os.execute("sleep " .. config.acclimatizeSleepTime)
+      firstSlot = inventory.getStackInInternalSlot(1)
+    end
+    
     print("Breed: ", targetType)
     breed.breedOnce(princessType, droneType, targetType, overrideTemp, overrideHumidity, biome)
     print("Purify")
@@ -60,5 +73,6 @@ for task = 1, #tasks do
     inv_utils.dropOffPrincess()
     print("Trash Hybrids")
     breed.trashHybrids()
+    gps.move(config.locs["Home"].pos)
   end
 end

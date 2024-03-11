@@ -9,31 +9,28 @@ local gps = require("gps")
 local computer = require("computer")
 
 local function addBeePair()
-  --print("Adding bee pair to Alveary")
   local princess = inventory.getStackInInternalSlot(config.princessSlot)
   local drone = inventory.getStackInInternalSlot(config.droneSlot)
-  while princess == nil or drone == nil or utils.hasDenylistEffect(princess) do
+  while princess == nil or (drone == nil and not utils.isQueen(princess)) or utils.hasDenylistEffect(princess) do
     computer.beep("...---...")
     os.execute("sleep " .. config.acclimatizeSleepTime)
     princess = inventory.getStackInInternalSlot(config.princessSlot)
-    drone = inventory.getStackInInternalSlot(config.droneSlot)
+    if not utils.isQueen(princess) then
+      drone = inventory.getStackInInternalSlot(config.droneSlot)
+    end
   end
-  robot.up()
-  robot.up()
+  gps.move(config.locs["AlvearyDropoff"].pos)
+  gps.turn(config.locs["AlvearyDropoff"].dir)
   robot.select(config.princessSlot)
   inventory.dropIntoSlot(sides.forward, 1)
   robot.select(config.droneSlot)
   inventory.dropIntoSlot(sides.forward, 2)
-  robot.down()
-  robot.down()
 end
 
 local function isAlvearyDone()
-  robot.up()
-  robot.up()
+  gps.move(config.locs["AlvearyDropoff"].pos)
+  gps.turn(config.locs["AlvearyDropoff"].dir)
   local queen = inventory.getStackInSlot(sides.forward, 1)
-  robot.down()
-  robot.down()
   return queen == nil
 end
 
@@ -43,13 +40,15 @@ local function waitForQueenDeath()
     if isAlvearyDone() then
       return
     end
+    gps.move(config.locs["Home"].pos)
+    gps.turn(config.locs["Home"].dir)
     os.execute("sleep " .. config.acclimatizeSleepTime)
   end
 end
 
 local function takeAllFromAlveary()
-  robot.up()
-  robot.up()
+  gps.move(config.locs["AlvearyDropoff"].pos)
+  gps.turn(config.locs["AlvearyDropoff"].dir)
   robot.select(config.alvearySlot)
   for slot = 3, inventory.getInventorySize(sides.forward) do
     local item = inventory.getStackInSlot(sides.forward, slot)
@@ -63,36 +62,30 @@ local function takeAllFromAlveary()
       inventory.suckFromSlot(sides.forward, slot, stackSize)
     end
   end
-  robot.down()
-  robot.down()
 end
 
 local function getAlvearyComponentRemaining(itemName)
-  gps.moveTo(config.alvearySupplyPos)
+  gps.move(config.locs["AlvearySupply"].pos)
   local count = 0
   for slot = 1, inventory.getInventorySize(sides.down) do
     local item = inventory.getStackInSlot(sides.down, slot)
     if item ~= nil and item.label == itemName then
-      gps.moveHome(config.alvearySupplyPos)
       return item.size
     end
   end
-  gps.moveHome(config.alvearySupplyPos)
   return 0
 end
 
 local function getAlvearyItem(itemName)
-  gps.moveTo(config.alvearySupplyPos)
+  gps.move(config.locs["AlvearySupply"].pos)
   for slot = 1, inventory.getInventorySize(sides.down) do
     local item = inventory.getStackInSlot(sides.down, slot)
     if item ~= nil and item.label == itemName then
       local stackSize = item.size
       inventory.suckFromSlot(sides.down, slot, stackSize)
-      gps.moveHome(config.alvearySupplyPos)
       return
     end
   end
-  gps.moveHome(config.alvearySupplyPos)
 end
 
 local function getFirstAvailableSlot(side)
@@ -120,7 +113,7 @@ local function getAlvearySlot(alvearyItem, side)
 end
 
 local function returnAlvearyItems()
-  gps.moveTo(config.alvearySupplyPos)
+  gps.move(config.locs["AlvearySupply"].pos)
   for slot = 1, robot.inventorySize() do
     local item = inventory.getStackInInternalSlot(slot)
     if item ~= nil and string.find(item.label, "Alveary") then
@@ -128,7 +121,6 @@ local function returnAlvearyItems()
       inventory.dropIntoSlot(sides.down, getAlvearySlot(item.label, sides.down))
     end
   end
-  gps.moveHome(config.alvearySupplyPos)
 end
 
 local function toggleAlvearyComponent(mainItem, positions, number)
@@ -142,21 +134,12 @@ local function toggleAlvearyComponent(mainItem, positions, number)
   getAlvearyItem(numAdd < 0 and "Alveary" or mainItem)
 
   for i = numEnabled + 1 + (numAdd < 0 and numAdd or 0), numEnabled + (numAdd < 0 and 0 or numAdd) do
-    local pos = positions[i]
-    gps.moveTo(pos)
-    for turn = 1, pos[4] do
-      robot.turnLeft()
-    end
+    gps.move(positions[i].pos)
+    gps.turn(positions[i].dir)
     
     robot.swing()
     robot.place()
-    
-    for turn = 1, pos[4] do
-      robot.turnRight()
-    end
-    gps.moveHome(pos)
   end
-
   returnAlvearyItems()
 end
 
@@ -199,6 +182,11 @@ end
 local function acclimatizeAlveary(bee, tempOverride, humidityOverride)
   local temp = (tempOverride ~= nil) and tempOverride or bee.individual.active.species.temperature
   local humidity = (humidityOverride ~= nil) and humidityOverride or bee.individual.active.species.humidity
+  
+  if not config.enableAcclimatizeAlveary then
+    temp = (tempOverride ~= nil) and tempOverride or "Normal"
+    humidity = (humidityOverride ~= nil) and humidityOverride or "Normal"
+  end
   
   if isHot(temp) > 0 then
     toggleHeater(isHot(temp))

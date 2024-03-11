@@ -10,8 +10,27 @@ local gps = require("gps")
 local robot = require("robot")
 local sides = require("sides")
 
-local function placeSupportBlock(block, tool)
-  gps.moveTo(config.alvearySupplyPos)
+local function placeSupportBlock(block, tool, biomePos)
+  local focusPos = {biomePos[1], biomePos[2]+1, biomePos[3]}
+  if block ~= nil then
+    gps.move(focusPos)
+    gps.turn(config.biomeDir)
+    for slot = 1, inventory.getInventorySize(sides.forward) do
+      local item = inventory.getStackInSlot(sides.forward, slot)
+      if item ~= nil then
+        robot.select(1)
+        inventory.suckFromSlot(sides.forward, slot, 1)
+        break
+      end
+    end
+    
+    gps.move(config.locs["Transvector"].pos)
+    gps.turn(config.locs["Transvector"].dir)
+    robot.select(1)
+    inventory.dropIntoSlot(sides.forward, 1)
+  end
+  
+  gps.move(config.locs["AlvearySupply"].pos)
   for slot = 1, inventory.getInventorySize(sides.down) do
     local item = inventory.getStackInSlot(sides.down, slot)
     if item ~= nil then
@@ -26,43 +45,49 @@ local function placeSupportBlock(block, tool)
       end
     end
   end
-  gps.moveHome(config.alvearySupplyPos)
   
-  gps.moveTo(config.supportBlockPos)
+  gps.move(config.locs["SupportBlock"].pos)
   robot.select(1)
   robot.placeDown()
-  gps.moveHome(config.supportBlockPos)
   
   if block ~= "Block of Redstone" then
-    gps.moveTo(config.transvectorPos)
-    redstone.setOutput(sides.down, 15)
-    redstone.setOutput(sides.down, 0)
-    gps.moveHome(config.transvectorPos)
+    gps.move(config.locs["Transvector"].pos)
+    gps.turn(config.locs["Transvector"].dir)
+    redstone.setOutput(sides.forward, 15)
+    redstone.setOutput(sides.forward, 0)
   end
   
-  gps.moveTo(config.supportBlockPos)
+  gps.move(config.locs["SupportBlock"].pos)
   robot.select(1)
   robot.swingDown()
-  gps.moveHome(config.supportBlockPos)
   
-  gps.moveTo(config.alvearySupplyPos)
+  gps.move(config.locs["AlvearySupply"].pos)
   robot.select(1)
   inventory.dropIntoSlot(sides.down, inv_utils.getFirstAvailableSlot(sides.down))
   robot.select(2)
   inventory.equip()
   inventory.dropIntoSlot(sides.down, inv_utils.getFirstAvailableSlot(sides.down))
-  gps.moveHome(config.alvearySupplyPos)
+  
+  if block ~= nil then
+    gps.move(config.locs["Transvector"].pos)
+    gps.turn(config.locs["Transvector"].dir)
+    robot.select(1)
+    inventory.suckFromSlot(sides.forward, 1, 1)
+    
+    gps.move(focusPos)
+    gps.turn(config.biomeDir)
+    inventory.dropIntoSlot(sides.forward, 1)
+  end
 end
 
 local function getPurestDrone(droneType, secondaryType)
   --print("Retrieving a drone of type: ", droneType)
   robot.select(15)
-  gps.moveTo(config.dronePos)
+  gps.move(config.locs["DroneSupply"].pos)
   for slot = 1, inventory.getInventorySize(sides.down) do
     local drone = inventory.getStackInSlot(sides.down, slot)
     if drone ~= nil and utils.getBeeType(drone) == droneType and not utils.isHybrid(drone) then
       inventory.suckFromSlot(sides.down, slot, 1)
-      gps.moveHome(config.dronePos)
       return
     end
   end
@@ -70,7 +95,6 @@ local function getPurestDrone(droneType, secondaryType)
     local drone = inventory.getStackInSlot(sides.down, slot)
     if drone ~= nil and utils.getBeeType(drone) == droneType then
       inventory.suckFromSlot(sides.down, slot, 1)
-      gps.moveHome(config.dronePos)
       return
     end
   end
@@ -78,7 +102,6 @@ local function getPurestDrone(droneType, secondaryType)
     local drone = inventory.getStackInSlot(sides.down, slot)
     if drone ~= nil and utils.getBeeType(drone) == secondaryType then
       inventory.suckFromSlot(sides.down, slot, 1)
-      gps.moveHome(config.dronePos)
       return
     end
   end
@@ -86,11 +109,9 @@ local function getPurestDrone(droneType, secondaryType)
     local drone = inventory.getStackInSlot(sides.down, slot)
     if drone ~= nil then
       inventory.suckFromSlot(sides.down, slot, 1)
-      gps.moveHome(config.dronePos)
       return
     end
   end
-  gps.moveHome(config.dronePos)
   error("Could not find a drone of type: ", droneType)
 end
 
@@ -99,8 +120,8 @@ local function purify(originalPrincessType)
   inv_utils.acclimatize()
   local princess = inventory.getStackInInternalSlot(config.princessSlot)
   while (utils.getBeeType(princess) == originalPrincessType or inv_utils.getNumDrones(originalPrincessType) > 0) and (utils.isHybrid(princess) or utils.getBeeType(princess) ~= originalPrincessType) do
-    alveary.toggleStabilizer(1)
     getPurestDrone(originalPrincessType, utils.getInactiveSpecies(princess))
+    alveary.toggleStabilizer(1)
     
     alveary.addBeePair()
     alveary.waitForQueenDeath()
@@ -159,7 +180,64 @@ local function ensureSupply(droneType, minAmount, targetAmount)
   end
 end
 
+local function useMutatron(princessType, droneType, targetType)
+  ensureSupply(droneType, config.minDrones, config.targetDroneCount)
+  if inventory.getStackInInternalSlot(config.princessSlot) ~= nil then
+    inv_utils.dropOffPrincess()
+  end
+  inv_utils.getBestPrincess(princessType)
+  purify(princessType)
+  inv_utils.getBestPrincess(princessType)
+  inv_utils.getDrone(droneType, droneType)
+  
+  gps.move(config.locs["Mutatron"].pos)
+  robot.select(config.princessSlot)
+  inventory.dropIntoSlot(sides.down, inv_utils.getFirstAvailableSlot(sides.down))
+  robot.select(config.droneSlot)
+  inventory.dropIntoSlot(sides.down, inv_utils.getFirstAvailableSlot(sides.down))
+  
+  robot.select(config.princessSlot)
+  local isDone = false
+  while not isDone do
+    gps.move(config.locs["AcclimatizerResult"].pos)
+    os.execute("sleep " .. config.acclimatizeSleepTime)
+    isDone = inventory.suckFromSlot(sides.down, 1)
+  end
+  
+  queen = inventory.getStackInInternalSlot(config.princessSlot)
+  
+  if not queen.individual.isNatural then
+    gps.move(config.biomePos["Ignoble"])
+    gps.turn(config.biomeDir)
+    robot.select(config.princessSlot)
+    inventory.dropIntoSlot(sides.forward, inv_utils.getFirstAvailableSlot(sides.forward))
+    
+    isDone = false
+    while not isDone do
+      os.execute("sleep " .. config.acclimatizeSleepTime)
+      gps.move(config.biomeFinishPos)
+      gps.turn(config.biomeDir)
+      isDone = inventory.suckFromSlot(sides.forward, 1)
+      gps.move(config.locs["Home"].pos)
+    end
+  end
+  
+  queen = inventory.getStackInInternalSlot(config.princessSlot)
+  inv_utils.acclimatize()
+  alveary.addBeePair()
+  alveary.waitForQueenDeath()
+  alveary.takeAllFromAlveary()
+  inv_utils.pickUpLarvae()
+  inv_utils.dropOffLarvae()
+  inv_utils.dropOffDrones()
+end
+
 local function breedOnce(princessType, droneType, targetType, tempOverride, humidityOverride, biome)
+  if config.enableMutatron then
+    useMutatron(princessType, droneType, targetType)
+    return
+  end
+
   ensureSupply(droneType, config.minDrones, config.targetDroneCount)
   if inventory.getStackInInternalSlot(config.princessSlot) ~= nil then
     inv_utils.dropOffPrincess()
@@ -213,7 +291,7 @@ end
 local function trashHybrids()
   while true do
     robot.select(1)
-    gps.moveTo(config.dronePos)
+    gps.move(config.locs["DroneSupply"].pos)
     local stackCount = 0
     for slot = inventory.getInventorySize(sides.down), 1, -1 do
       local drone = inventory.getStackInSlot(sides.down, slot)
@@ -225,8 +303,7 @@ local function trashHybrids()
         break
       end
     end
-    gps.moveHome(config.dronePos)
-    gps.moveTo(config.trashPos)
+    gps.move(config.locs["Trash"].pos)
     for slot = 1, robot.inventorySize() do
       local drone = inventory.getStackInInternalSlot(slot)
       if not isImportantSlot(slot) and drone ~= nil and utils.isDrone(drone) and utils.isHybrid(drone) then
@@ -234,7 +311,6 @@ local function trashHybrids()
         inventory.dropIntoSlot(sides.down, 1)
       end
     end
-    gps.moveHome(config.trashPos)
     if stackCount == 0 then
       break
     end
