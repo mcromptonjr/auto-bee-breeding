@@ -33,19 +33,50 @@ local function getAvailableDroneTypes()
   return set
 end
 
-local function calculateBeeBreedTasks()
+local function calculateBeeBreedTasks(beeType)
   local droneTypes = getAvailableDroneTypes()
-  local beeTreeCopy = utils.copyTable(config.beeTree)
-  local tasks = {} -- This is an array of tables, each "table" is a single row
-  while utils.tableLength(beeTreeCopy) > 0 do
-    for k, v in pairs(beeTreeCopy) do
-      if droneTypes[k] then
-        beeTreeCopy[k] = nil
-      elseif droneTypes[v[1]] and droneTypes[v[2]] then
-        local task = {[k] = v}
-        table.insert(tasks, task)
-        beeTreeCopy[k] = nil
-        droneTypes[k] = true
+  if droneTypes[beeType] then
+    return {}
+  end
+  local taskLength = 1
+  local lastTaskLength = 0
+  local tasks = {}
+  table.insert(tasks, {[beeType] = config.beeTree[beeType]})
+  local children = {[config.beeTree[beeType][1]] = {[beeType] = true}, [config.beeTree[beeType][1]] = {[beeType] = true}}
+  while taskLength > lastTaskLength do
+    lastTaskLength = taskLength
+    for _, task in ipairs(tasks) do
+      for k, v in pairs(task) do
+        for _, parent in ipairs(v) do
+          if not droneTypes[parent] and config.beeTree[parent] == nil then
+            local beeLine = parent
+            local cur = k
+            while cur ~= nil do
+              beeLine = beeLine .. "," .. cur
+              local cs = children[cur]
+              cur = nil
+              if cs == nil then
+                break
+              end
+              for k, v in pairs(cs) do
+                cur = k
+                break
+              end
+            end
+            print("Insufficient base drones for breeding: ", beeLine)
+            return {}
+          end
+          if not droneTypes[parent] then
+            --tasks[parent] = config.beeTree[parent]
+            table.insert(tasks, 1, {[parent] = config.beeTree[parent], depth = })
+            taskLength = taskLength + 1
+            droneTypes[parent] = true
+            if children[parent] == nil then
+              children[parent] = {}
+            end
+            children[parent][k] = true
+          end
+        end
       end
     end
   end
@@ -53,7 +84,7 @@ local function calculateBeeBreedTasks()
 end
 
 -- Assumes bee to acclimatize is in slot 16 (should be a Queen)
-local function acclimatize(tempOverride, humidityOverride)
+local function acclimatize(tempOverride, humidityOverride, mutatronIsDisabled)
   robot.select(16)
   gps.move(config.locs["Acclimatizer"].pos)
   inventory.dropIntoSlot(sides.down, getFirstAvailableSlot(sides.down))
@@ -63,7 +94,7 @@ local function acclimatize(tempOverride, humidityOverride)
     os.execute("sleep " .. config.acclimatizeSleepTime)
     isDone = inventory.suckFromSlot(sides.down, 1)
   end
-  if config.enableAcclimatizeAlveary then
+  if config.enableAcclimatizeAlveary and mutatronIsDisabled then
     alveary.acclimatizeAlveary(inventory.getStackInInternalSlot(config.princessSlot), tempOverride, humidityOverride)
   end
 end
@@ -104,7 +135,7 @@ local function getDrone(droneType, targetType)
     local drone = inventory.getStackInSlot(sides.down, slot)
     if drone ~= nil and utils.getBeeType(drone) == droneType and selectedSlot == 0 then
       selectedSlot = slot
-    elseif drone ~= nil and utils.getBeeType(drone) == droneType and utils.getInactiveSpecies(drone) == targetType then
+    elseif drone ~= nil and utils.getBeeType(drone) == droneType and not utils.isHybrid(drone) then
       selectedSlot = slot
       break
     end
@@ -231,7 +262,6 @@ local function waitFromBiome()
     end
     dropOffLarvae()
     trashUselessBees()
-    gps.move()
   end
 end
 

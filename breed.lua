@@ -117,6 +117,7 @@ end
 
 -- Assumes princess is in princessSlot
 local function purify(originalPrincessType)
+  print("Purify")
   inv_utils.acclimatize()
   local princess = inventory.getStackInInternalSlot(config.princessSlot)
   while (utils.getBeeType(princess) == originalPrincessType or inv_utils.getNumDrones(originalPrincessType) > 0) and (utils.isHybrid(princess) or utils.getBeeType(princess) ~= originalPrincessType) do
@@ -139,8 +140,9 @@ local function purify(originalPrincessType)
 end
 
 local function ensureSupply(droneType, minAmount, targetAmount)
+  print("Ensure Supply")
   local numDrones = inv_utils.getNumDrones(droneType, true)
-  --print("Found drones of type: ", droneType, numDrones)
+  print("Found drones of type: ", droneType, numDrones)
   if numDrones >= minAmount then
     return
   end
@@ -181,49 +183,57 @@ local function ensureSupply(droneType, minAmount, targetAmount)
 end
 
 local function useMutatron(princessType, droneType, targetType)
-  ensureSupply(droneType, config.minDrones, config.targetDroneCount)
-  if inventory.getStackInInternalSlot(config.princessSlot) ~= nil then
-    inv_utils.dropOffPrincess()
-  end
-  inv_utils.getBestPrincess(princessType)
-  purify(princessType)
-  inv_utils.getBestPrincess(princessType)
-  inv_utils.getDrone(droneType, droneType)
-  
-  gps.move(config.locs["Mutatron"].pos)
-  robot.select(config.princessSlot)
-  inventory.dropIntoSlot(sides.down, inv_utils.getFirstAvailableSlot(sides.down))
-  robot.select(config.droneSlot)
-  inventory.dropIntoSlot(sides.down, inv_utils.getFirstAvailableSlot(sides.down))
-  
-  robot.select(config.princessSlot)
-  local isDone = false
-  while not isDone do
-    gps.move(config.locs["AcclimatizerResult"].pos)
-    os.execute("sleep " .. config.acclimatizeSleepTime)
-    isDone = inventory.suckFromSlot(sides.down, 1)
-  end
-  
-  queen = inventory.getStackInInternalSlot(config.princessSlot)
-  
-  if not queen.individual.isNatural then
-    gps.move(config.biomePos["Ignoble"])
-    gps.turn(config.biomeDir)
-    robot.select(config.princessSlot)
-    inventory.dropIntoSlot(sides.forward, inv_utils.getFirstAvailableSlot(sides.forward))
-    
-    isDone = false
-    while not isDone do
-      os.execute("sleep " .. config.acclimatizeSleepTime)
-      gps.move(config.biomeFinishPos)
-      gps.turn(config.biomeDir)
-      isDone = inventory.suckFromSlot(sides.forward, 1)
-      gps.move(config.locs["Home"].pos)
+  print("Use Mutatron", princessType, droneType, targetType)
+  repeat
+    ensureSupply(droneType, config.minDrones, config.targetDroneCount)
+    if inventory.getStackInInternalSlot(config.princessSlot) ~= nil then
+      inv_utils.dropOffPrincess()
     end
-  end
+    inv_utils.getBestPrincess(princessType)
+    purify(princessType)
+    inv_utils.getBestPrincess(princessType)
+    inv_utils.getDrone(droneType, droneType)
+    
+    gps.move(config.locs["Mutatron"].pos)
+    robot.select(config.princessSlot)
+    inventory.dropIntoSlot(sides.down, inv_utils.getFirstAvailableSlot(sides.down))
+    robot.select(config.droneSlot)
+    inventory.dropIntoSlot(sides.down, inv_utils.getFirstAvailableSlot(sides.down))
+    
+    robot.select(config.princessSlot)
+    local isDone = false
+    while not isDone do
+      gps.move(config.locs["AcclimatizerResult"].pos)
+      os.execute("sleep " .. config.acclimatizeSleepTime)
+      isDone = inventory.suckFromSlot(sides.down, 1)
+    end
+    
+    queen = inventory.getStackInInternalSlot(config.princessSlot)
+    
+    if not queen.individual.isNatural then
+      gps.move(config.biomePos["Ignoble"])
+      gps.turn(config.biomeDir)
+      robot.select(config.princessSlot)
+      inventory.dropIntoSlot(sides.forward, inv_utils.getFirstAvailableSlot(sides.forward))
+      
+      isDone = false
+      while not isDone do
+        os.execute("sleep " .. config.acclimatizeSleepTime)
+        gps.move(config.biomeFinishPos)
+        gps.turn(config.biomeDir)
+        isDone = inventory.suckFromSlot(sides.forward, 1)
+        gps.move(config.locs["Home"].pos)
+      end
+    end
+    
+    queen = inventory.getStackInInternalSlot(config.princessSlot)
+    inv_utils.acclimatize()
   
-  queen = inventory.getStackInInternalSlot(config.princessSlot)
-  inv_utils.acclimatize()
+    if utils.getBeeType(queen) ~= targetType then
+      inv_utils.dropOffPrincess()
+    end
+  until utils.getBeeType(queen) == targetType
+  
   alveary.addBeePair()
   alveary.waitForQueenDeath()
   alveary.takeAllFromAlveary()
@@ -233,10 +243,12 @@ local function useMutatron(princessType, droneType, targetType)
 end
 
 local function breedOnce(princessType, droneType, targetType, tempOverride, humidityOverride, biome)
-  if config.enableMutatron then
+  print("Breed Once", targetType, config.enableMutatron, config.mutatronSpecialBees.disabled[targetType])
+  if config.enableMutatron and config.mutatronSpecialBees.disabled[targetType] == nil then
     useMutatron(princessType, droneType, targetType)
     return
   end
+  print("Dont use mutatron")
 
   ensureSupply(droneType, config.minDrones, config.targetDroneCount)
   if inventory.getStackInInternalSlot(config.princessSlot) ~= nil then
@@ -249,7 +261,7 @@ local function breedOnce(princessType, droneType, targetType, tempOverride, humi
     
     local princess = inventory.getStackInInternalSlot(config.princessSlot)
     if utils.getBeeType(princess) == princessType then
-      inv_utils.acclimatize(tempOverride, humidityOverride)
+      inv_utils.acclimatize(tempOverride, humidityOverride, config.mutatronSpecialBees.disabled[targetType])
     else
       inv_utils.acclimatize()
     end

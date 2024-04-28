@@ -1,102 +1,74 @@
 
+local JSON = require("JSON")
+local io = require("io")
+
 local pickaxeName = "§fPickaxe"
 local wrenchName = "Wrench"
 
--- Centauri Bees
--- Silverfish
+local mutation_json = ""
+for line in io.lines("mutations.json") do
+  mutation_json = mutation_json .. line
+end
 
--- Iridium, Lead, Enceladus, Saturn, Naquadria, Desh
+function convertName(species)
+  if species == "Thaumic Shards" then
+    return "Thaumiumshard"
+  end
+  if species == "Wither" then
+    return "Sparkeling"
+  end
+  local name = string.gsub(species, "[^a-zA-Z]", "")
+  name = string.lower(name)
+  
+  return string.upper(string.sub(name, 1, 1)) .. string.sub(name, 2)
+end
+
+local foundationRegex = "Requires (.*) as a foundation%."
+local biomeRegex = "Required Biome (.*)"
+local biomeRegex2 = "Occurs within a (.*) biome%."
+local dimensionRegex = "Required Dimension (.*)"
+local temperatureRegex = "Requires (.*) temperature%."
+local temperatureRegex2 = "Requires temperature between (.*) and .*%."
+local humidityRegex = "Requires (.*) humidity%."
+
+local regularExps = { 
+  {desc = "support", regex = foundationRegex},
+  {desc = "biome", regex = biomeRegex},
+  {desc = "biome", regex = biomeRegex2},
+  {desc = "biome", regex = dimensionRegex},
+  {desc = "overrideTemp", regex = temperatureRegex},
+  {desc = "overrideTemp", regex = temperatureRegex2},
+  {desc = "overrideHumidity", regex = humidityRegex},
+}
+
+local mutations = JSON:decode(mutation_json)
+local beeTree = {}
+for i,mutation in ipairs(mutations.data.beeMutations) do
+  local child = convertName(mutation.offspring.specie)
+  local parentA = convertName(mutation.parentA.specie)
+  local parentB = convertName(mutation.parentB.specie)
+  local subTree = {parentA, parentB}
+  local biome = nil
+  local support = nil
+  for i,requirement in ipairs(mutation.descriptions) do
+    for _,re in ipairs(regularExps) do
+      local s, e, group = string.find(requirement.description, re.regex)
+      if s ~= nil then
+        subTree[re.desc] = group
+      end
+    end
+  end
+  beeTree[child] = subTree
+end
+
+local mutatronSpecialBees = {
+  requirements = {"Leporine", "Merry", "Tipsy", "Tricky", "Chad", "Americium", "Kevlar", "Drake"}, 
+  disabled = {["Cosmicneutronium"] = true, ["Infinitycatalyst"] = true, ["Infinity"] = true, ["Indium"] = true}
+}
 
 local config = {
-  beeTree = {
-    ["Salt"] = {"Clay", "Aluminium"}
-    --["Ash"] = {"Coal", "Clay"},
-    --["Tainted"] = {"Thaumiumdust", "Thaumiumshard"},
-    --["Silverfish"] = {"Ectoplasma", "Stardust"},
-    --["Ectoplasma"] = {"Ender", "Enddust"},
-    --["Stardust"] = {"Ender", "Zinc"}
-    --["Centauri"] = {"Makemake", "Desh"},
-    --["Makemake"] = {"Pluto", "Naquadria"},
-    --["Pluto"] = {"Neptune", "Plutonium"},
-    --["Neptune"] = {"Uranus", "Oriharukon"},
-    --["Uranus"] = {"Saturn", "Trinium"},
-    --["Trinium"] = {"Enceladus", "Iridium"},
-    --["Oriharukon"] = {"Lead", "Oberon"},
-    --["Oberon"] = {"Uranus", "Iridium"}
-  },
-  
-  --    ["Naga"] = {"Eldritch", "Imperial"}
-  --    ["Desh"] = {"Mars", "Titanium", biome="Hellish"},
---    ["Frigid"] = {"Wintry", "Diligent"},
---    ["Ledox"] = {"Callisto", "Lead", biome="End"},
---    ["Callisto"] = {"Jupiter", "Frigid", biome="Hellish"}
-  
-  --beeTree = {
-  --  ["Salismundus"] = {"Thaumiumdust", "Thaumiumshard", biome="Icy"},
-  --  ["Thaumiumdust"] = {"Ignis", "Edenic", biome="Icy"},
-  --  ["Thaumiumshard"] = {"Thaumiumdust", "Aqua", biome="Icy"},
-  --  ["Ignis"] = {"Firey", "Firey", support="Fire Crystal Cluster"},
-  --  ["Edenic"] = {"Exotic", "Tropical"},
-  --  ["Aqua"] = {"Watery", "Watery", support="Water Crystal Cluster"},
-  --  ["Exotic"] = {"Austere", "Tropical"},
-  --  ["Firey"] = {"Supernatural", "Ethereal", needsHumanHelp=true},
-  --  ["Watery"] = {"Supernatural", "Ethereal", needsHumanHelp=true}
-  --},
-
-  --beeTree = {
-  --  ["Endshard"] = {"Nethershard", "Enddust", biome="Icy", support="Block of Endereye"},
-  --  ["Nethershard"] = {"Chaos", "Fire", support="Block of Nether Star"},
-  --  ["Chaos"] = {"Order", "Fire", biome="Icy", support="Entropy Crystal Cluster"},
-  --  ["Order"] = {"Earth", "Fire", biome="Icy", support="Order Crystal Cluster"},
-  --  ["Earth"] = {"Water", "Fire", overrideTemp="Warm", support="Earth Crystal Cluster"},
-  --  ["Water"] = {"Fire", "Air", biome="Icy", support="Water Crystal Cluster"},
-  --  ["Fire"] = {"Supernatural", "Air", biome="Hellish"},
-  --  ["Air"] = {"Supernatural", "Windy", overrideTemp="Hot", support="Air Crystal Cluster"},
-  --  ["Enddust"] = {"Ender", "Stainlesssteel", biome="End"},
-  --  ["Stainlesssteel"] = {"Chrome", "Steel", support="Block of Stainless Steel"},
-  --  ["Steel"] = {"Iron", "Coal", support="Block of Steel", overrideTemp="Hot"}
-  --},
-  --beeTree = {
-  --  ["Space"] = {"Industrious", "Heroic", biome="Icy"},
-  --  ["Moon"] = {"Space", "Clay", biome="Moon"},
-  --  ["Mars"] = {"Moon", "Iron", biome="Mars"}
-  --},
-  --beeTree = {
-  --  ["Gold"] = {"Lead", "Copper", support="Block of Gold", tool=pickaxeName, overrideTemp="Hot", overrideHumidity="Normal"},
-  --  ["Redstone"] = {"Industrious", "Demonic", support="Block of Redstone", tool=pickaxeName},
-  --  ["Glowstone"] = {"Redstone", "Gold"},
-  --  ["Sunnarium"] = {"Glowstone", "Gold", support="Superconducting Coil Block", tool=wrenchName}
-  --},
-  -- Monastic, Demonic, Ender, Imperial, Modest, Sinister, Coal, Steadfast, Valiant, Copper, Tin, Redstone
-  --beeTree = {
-  --  ["Naquadah"] = {"Plutonium", "Iridium", support="Block of Naquadah"},
-  --  ["Plutonium"] = {"Uranium", "Emerald", support="Block of Plutonium 239"},
-  --  ["Iridium"] = {"Tungsten", "Platinum", support="Block of Iridium"},
-  --  ["Uranium"] = {"Avenging", "Platinum", support="Block of Uranium 238"},
-  --  ["Emerald"] = {"Olivine", "Diamond", support="Block of Emerald"},
-  --  ["Tungsten"] = {"Heroic", "Manganese", support="Block of Tungsten"},
-  --  ["Platinum"] = {"Diamond", "Chrome", support="Block of Nickel"},
-  --  ["Avenging"] = {"Vengeful", "Vindictive"},
-  --  ["Vengeful"] = {"Monastic", "Vindictive"},
-  --  ["Vindictive"] = {"Monastic", "Demonic"},
-  --  ["Olivine"] = {"Certus", "Ender"},
-  --  ["Certus"] = {"Hermitic", "Lapis", support="Certus Quartz Block"},
-  --  ["Hermitic"] = {"Monastic", "Secluded"},
-  --  ["Lapis"] = {"Demonic", "Imperial", support="Lapis Lazuli Block"},
-  --  ["Secluded"] = {"Monastic", "Austere"},
-  --  ["Austere"] = {"Modest", "Frugal", overrideTemp="Hot", overrideHumidity="Arid"},
-  --  ["Frugal"] = {"Modest", "Sinister", overrideTemp="Hot", overrideHumidity="Arid"},
-  --  ["Diamond"] = {"Certus", "Coal", support="Block of Diamond"},
-  --  ["Heroic"] = {"Steadfast", "Valiant", biome="Forest"},
-  --  ["Manganese"] = {"Titanium", "Aluminium", support="Block of Manganese"},
-  --  ["Aluminium"] = {"Nickel", "Zinc", support="Block of Aluminum"},
-  --  ["Nickel"] = {"Iron", "Copper", support="Block of Nickel"},
-  --  ["Zinc"] = {"Iron", "Tin", support="Block of Zinc"},
-  --  ["Iron"] = {"Tin", "Copper", support="Block of Iron"},
-  --  ["Titanium"] = {"Redstone", "Aluminium", support="Block of Titanium"},
-  --  ["Chrome"] = {"Titanium", "Ruby", support="Block of Chrome"},
-  --  ["Ruby"] = {"Redstone", "Diamond", support="Block of Ruby"}
-  --},
+  beeTree = beeTree,
+  mutatronSpecialBees = mutatronSpecialBees,
 
   acclimatizeSleepTime = 10, -- In seconds
 
@@ -126,11 +98,11 @@ local config = {
                      {pos = {-2, 0, 2}, dir = {1, 0, 0}}
                    },
   alvearyStabPos = {
-                     {pos = {-1, 1, 1}, dir = {0, 0, 1}}
+                     {pos = {-1, 1, 0}, dir = {0, 0, 1}}
                    },
   biomeFinishPos = {-3, 2, 0},
   biomePos = {
-    ["Icy"] = {-3, 2, 1},
+    ["Venus"] = {-3, 2, 1},
     ["End"] = {-3, 2, 2},
     ["Hellish"] = {-3, 2, 3},
     ["Ignoble"] = {-3, 2, 4},
@@ -166,7 +138,9 @@ local config = {
   roomBounds = {{-5, -1, -3}, {5, 7, 7}},
   alvearyBounds = {{-1, 0, 1}, {1, 3, 3}},
   
-  obstacles = {}
+  obstacles = {},
+  
+  mutations = mutations,
 }
 
 config.biomePos["None"] = config.biomeFinishPos
