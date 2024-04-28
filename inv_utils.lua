@@ -40,47 +40,66 @@ local function calculateBeeBreedTasks(beeType)
   end
   local taskLength = 1
   local lastTaskLength = 0
-  local tasks = {}
-  table.insert(tasks, {[beeType] = config.beeTree[beeType]})
-  local children = {[config.beeTree[beeType][1]] = {[beeType] = true}, [config.beeTree[beeType][1]] = {[beeType] = true}}
-  while taskLength > lastTaskLength do
-    lastTaskLength = taskLength
-    for _, task in ipairs(tasks) do
-      for k, v in pairs(task) do
-        for _, parent in ipairs(v) do
-          if not droneTypes[parent] and config.beeTree[parent] == nil then
-            local beeLine = parent
-            local cur = k
-            while cur ~= nil do
-              beeLine = beeLine .. "," .. cur
-              local cs = children[cur]
-              cur = nil
-              if cs == nil then
-                break
-              end
-              for k, v in pairs(cs) do
-                cur = k
-                break
-              end
-            end
-            print("Insufficient base drones for breeding: ", beeLine)
-            return {}
-          end
-          if not droneTypes[parent] then
-            --tasks[parent] = config.beeTree[parent]
-            table.insert(tasks, 1, {[parent] = config.beeTree[parent], depth = })
-            taskLength = taskLength + 1
-            droneTypes[parent] = true
-            if children[parent] == nil then
-              children[parent] = {}
-            end
-            children[parent][k] = true
-          end
-        end
+  local tasks = {[beeType] = config.beeTree[beeType]}
+  tasks[beeType].depth = 1
+  local stack = {[beeType] = true}
+  local children = {}
+  local missing = {}
+  while next(stack) ~= nil do
+    local child, _ = next(stack)
+    stack[child] = nil
+    local task = tasks[child]
+    for _, parent in ipairs(task) do
+      if children[parent] == nil then
+        children[parent] = {}
+      end
+      if not droneTypes[parent] and config.beeTree[parent] == nil then
+        children[parent][child] = true
+        missing[parent] = true
+      elseif not droneTypes[parent] then
+        droneTypes[parent] = true
+        stack[parent] = true
+        tasks[parent] = config.beeTree[parent]
+        children[parent][child] = true
+      end
+      if tasks[parent] ~= nil then
+        tasks[parent].depth = tasks[child].depth + 1
       end
     end
   end
-  return tasks
+  
+  if next(missing) ~= nil then
+    local parent, _ = next(missing)
+    local errorMessage = parent
+    while parent ~= nil do
+      local child, _ = children[parent]
+      errorMessage = errorMessage .. "," .. child
+      parent = child
+    end
+    print("Insufficient bees for breeding:", errorMessage)
+    return {}
+  end
+  
+  local taskDepths = {}
+  for bee, task in pairs(tasks) do
+    if taskDepths[task.depth] == nil then
+      for d = #taskDepths + 1, task.depth do
+        table.insert(taskDepths, {})
+      end
+    end
+    table.insert(taskDepths[task.depth], {[bee] = task})
+  end
+  
+  local orderedTasks = {}
+  for i = #taskDepths, 1, -1 do
+    if taskDepths[i] ~= nil then
+      for _, task in ipairs(taskDepths[i]) do
+        table.insert(orderedTasks, task)
+      end
+    end
+  end
+  
+  return orderedTasks
 end
 
 -- Assumes bee to acclimatize is in slot 16 (should be a Queen)
